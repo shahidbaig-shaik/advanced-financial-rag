@@ -18,8 +18,8 @@ COPY . .
 # Make the start script executable
 RUN chmod +x start.sh
 
-# Expose the port Render uses for web services (we will map Streamlit to this port)
-EXPOSE 8502
+# Expose the port Render uses for web services (we will map FastAPI to this port)
+EXPOSE 8001
 
 # Run the unified start script
 CMD ["./start.sh"]
