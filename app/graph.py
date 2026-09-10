@@ -34,11 +34,15 @@ def retrieve_node(state: GraphState):
     print(f"  Retrieved {len(documents)} high-quality chunks")
     return {"documents": documents}
 
+from app.sql_engine import query_financial_sql_database
+
 def sql_node(state: GraphState):
-    """Mock node for SQL DB."""
-    print("---SQL DATABASE---")
-    # In a real app, this would use LangChain's SQLDatabaseChain
-    return {"generation": "I am a mock SQL database. You asked for a number."}
+    """Executes deterministic Text-to-SQL against the financials SQLite database."""
+    print("---SQL DATABASE EXECUTION---")
+    question = state["question"]
+    langfuse_handler = state.get("langfuse_handler")
+    generation = query_financial_sql_database(question, langfuse_handler=langfuse_handler)
+    return {"generation": generation}
 
 def generate_node(state: GraphState):
     """Generates the final answer using Gemini 2.5 Flash."""
