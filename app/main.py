@@ -5,6 +5,9 @@ import shutil
 import uuid
 import time
 from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from app.hybrid_retriever import ingest_and_build_retriever
 from app.graph import app_graph
@@ -39,25 +42,33 @@ async def chat(request: QueryRequest):
     start_time = time.time()
     
     try:
-        # Create a Langfuse handler to trace this entire request
         langfuse_handler = get_langfuse_handler(
             user_id=request.user_id,
             session_id=session_id
         )
         
-        # Pass the handler into the graph state so nodes can use it
-        state = app_graph.invoke({
-            "question": request.question,
-            "langfuse_handler": langfuse_handler
-        })
+        invoke_state = {"question": request.question}
+        if langfuse_handler:
+            invoke_state["langfuse_handler"] = langfuse_handler
+            
+        state = app_graph.invoke(invoke_state)
         
         latency_ms = round((time.time() - start_time) * 1000)
         
-        # Flush traces to Langfuse
-        langfuse_handler.flush()
+        if langfuse_handler:
+            if hasattr(langfuse_handler, "_langfuse_client"):
+                try:
+                    langfuse_handler._langfuse_client.flush()
+                except Exception:
+                    pass
+            elif hasattr(langfuse_handler, "flush"):
+                try:
+                    langfuse_handler.flush()
+                except Exception:
+                    pass
         
         return {
-            "answer": state["generation"],
+            "answer": state.get("generation", ""),
             "route_taken": state.get("datasource", "unknown"),
             "session_id": session_id,
             "latency_ms": latency_ms
