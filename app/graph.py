@@ -1,5 +1,5 @@
 from langgraph.graph import StateGraph, END
-from typing import TypedDict
+from typing import TypedDict, Optional, Any
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.output_parsers import StrOutputParser
@@ -14,6 +14,7 @@ class GraphState(TypedDict):
     generation: str
     documents: list
     datasource: str
+    langfuse_handler: Optional[Any]
 
 # 2. Define the Nodes
 def route_node(state: GraphState):
@@ -44,6 +45,7 @@ def generate_node(state: GraphState):
     print("---GENERATE ANSWER---")
     question = state["question"]
     documents = state["documents"]
+    langfuse_handler = state.get("langfuse_handler")
     
     # Format documents
     context = "\n\n".join(doc.page_content for doc in documents)
@@ -66,7 +68,14 @@ Answer:""")
     )
     
     chain = prompt | llm | StrOutputParser()
-    generation = chain.invoke({"context": context, "question": question})
+    
+    # Invoke with Langfuse tracing if available
+    invoke_kwargs = {"context": context, "question": question}
+    config = {}
+    if langfuse_handler:
+        config["callbacks"] = [langfuse_handler]
+    
+    generation = chain.invoke(invoke_kwargs, config=config)
     
     return {"generation": generation}
 

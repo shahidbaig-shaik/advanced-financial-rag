@@ -2,15 +2,19 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from pydantic import BaseModel
 import os
 import shutil
+import uuid
+import time
 from pathlib import Path
 
 from app.hybrid_retriever import ingest_and_build_retriever
 from app.graph import app_graph
+from app.observability import get_langfuse_handler
 
 app = FastAPI(title="Advanced Financial Analyst RAG")
 
 class QueryRequest(BaseModel):
     question: str
+    user_id: str = "anonymous"
 
 @app.post("/upload")
 async def upload_document(file: UploadFile = File(...)):
@@ -23,7 +27,6 @@ async def upload_document(file: UploadFile = File(...)):
         shutil.copyfileobj(file.file, buffer)
         
     try:
-        # Build the RAG system with the new PDF
         ingest_and_build_retriever(str(file_path))
         return {"message": f"Successfully ingested {file.filename} into Hybrid Retriever + Re-ranker"}
     except Exception as e:
@@ -31,13 +34,33 @@ async def upload_document(file: UploadFile = File(...)):
 
 @app.post("/chat")
 async def chat(request: QueryRequest):
-    """Routes the query through LangGraph and returns the answer."""
+    """Routes the query through LangGraph with full Langfuse observability."""
+    session_id = str(uuid.uuid4())
+    start_time = time.time()
+    
     try:
-        # Pass the question to the LangGraph entry point
-        state = app_graph.invoke({"question": request.question})
+        # Create a Langfuse handler to trace this entire request
+        langfuse_handler = get_langfuse_handler(
+            user_id=request.user_id,
+            session_id=session_id
+        )
+        
+        # Pass the handler into the graph state so nodes can use it
+        state = app_graph.invoke({
+            "question": request.question,
+            "langfuse_handler": langfuse_handler
+        })
+        
+        latency_ms = round((time.time() - start_time) * 1000)
+        
+        # Flush traces to Langfuse
+        langfuse_handler.flush()
+        
         return {
             "answer": state["generation"],
-            "route_taken": state.get("datasource", "unknown")
+            "route_taken": state.get("datasource", "unknown"),
+            "session_id": session_id,
+            "latency_ms": latency_ms
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
