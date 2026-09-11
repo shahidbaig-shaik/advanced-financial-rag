@@ -7,6 +7,8 @@ from langchain_core.output_parsers import StrOutputParser
 from app.router import route_question
 from app.hybrid_retriever import get_retriever
 from app.config import settings
+from app.sql_engine import query_financial_sql_database
+from app.market_tool import query_live_market_data
 
 # 1. Define the Graph State
 class GraphState(TypedDict):
@@ -18,11 +20,11 @@ class GraphState(TypedDict):
 
 # 2. Define the Nodes
 def route_node(state: GraphState):
-    """Routes the question."""
+    """Routes the question dynamically to vectorstore, sql_database, or live_market_data."""
     print("---ROUTE QUESTION---")
     question = state["question"]
     datasource = route_question(question)
-    print(f"  Routing to: {datasource}")
+    print(f"  Routing decision: {datasource}")
     return {"datasource": datasource}
 
 def retrieve_node(state: GraphState):
@@ -34,8 +36,6 @@ def retrieve_node(state: GraphState):
     print(f"  Retrieved {len(documents)} high-quality chunks")
     return {"documents": documents}
 
-from app.sql_engine import query_financial_sql_database
-
 def sql_node(state: GraphState):
     """Executes deterministic Text-to-SQL against the financials SQLite database."""
     print("---SQL DATABASE EXECUTION---")
@@ -44,8 +44,16 @@ def sql_node(state: GraphState):
     generation = query_financial_sql_database(question, langfuse_handler=langfuse_handler)
     return {"generation": generation}
 
+def market_node(state: GraphState):
+    """Fetches real-time stock quotes and valuation metrics via yfinance."""
+    print("---LIVE MARKET TOOL EXECUTION---")
+    question = state["question"]
+    langfuse_handler = state.get("langfuse_handler")
+    generation = query_live_market_data(question, langfuse_handler=langfuse_handler)
+    return {"generation": generation}
+
 def generate_node(state: GraphState):
-    """Generates the final answer using Gemini 2.5 Flash."""
+    """Generates the final answer using Gemini Flash."""
     print("---GENERATE ANSWER---")
     question = state["question"]
     documents = state["documents"]
@@ -65,30 +73,38 @@ Question: {question}
 
 Answer:""")
     
-    llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
-        google_api_key=settings.gemini_api_key,
-        temperature=0.1
-    )
+    try:
+        llm = ChatGoogleGenerativeAI(
+            model="gemini-flash-latest",
+            google_api_key=settings.gemini_api_key,
+            temperature=0.1
+        )
+    except Exception:
+        llm = ChatGoogleGenerativeAI(
+            model="gemini-2.5-flash",
+            google_api_key=settings.gemini_api_key,
+            temperature=0.1
+        )
     
     chain = prompt | llm | StrOutputParser()
     
-    # Invoke with Langfuse tracing if available
     invoke_kwargs = {"context": context, "question": question}
     config = {}
     if langfuse_handler:
         config["callbacks"] = [langfuse_handler]
     
-    generation = chain.invoke(invoke_kwargs, config=config)
-    
+    generation = chain.invoke(invoke_kwargs, config=config if config else None)
     return {"generation": generation}
 
 # 3. Define the Edges
 def route_after_decision(state: GraphState):
-    if state["datasource"] == "sql_database":
+    if state["datasource"] == "live_market_data":
+        return "market"
+    elif state["datasource"] == "sql_database":
         return "sql"
     elif state["datasource"] == "vectorstore":
         return "retrieve"
+    return "retrieve"
 
 # 4. Build the Graph
 workflow = StateGraph(GraphState)
@@ -96,6 +112,7 @@ workflow = StateGraph(GraphState)
 workflow.add_node("router", route_node)
 workflow.add_node("retrieve", retrieve_node)
 workflow.add_node("sql", sql_node)
+workflow.add_node("market", market_node)
 workflow.add_node("generate", generate_node)
 
 workflow.set_entry_point("router")
@@ -105,10 +122,12 @@ workflow.add_conditional_edges(
     {
         "sql": "sql",
         "retrieve": "retrieve",
+        "market": "market",
     }
 )
 workflow.add_edge("retrieve", "generate")
 workflow.add_edge("sql", END)
+workflow.add_edge("market", END)
 workflow.add_edge("generate", END)
 
 # Compile

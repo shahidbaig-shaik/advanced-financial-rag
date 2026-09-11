@@ -82,6 +82,12 @@ html, body, [class*="css"] {
     border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
+.pill-gold {
+    background: rgba(245, 158, 11, 0.15);
+    color: #FBBF24;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
 .pill-blue {
     background: rgba(59, 130, 246, 0.15);
     color: #60A5FA;
@@ -135,6 +141,12 @@ section[data-testid="stSidebar"] {
     border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
+.route-market {
+    background: rgba(245, 158, 11, 0.15);
+    color: #FBBF24;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
 .route-vector {
     background: rgba(99, 102, 241, 0.15);
     color: #818CF8;
@@ -145,7 +157,7 @@ section[data-testid="stSidebar"] {
     display: inline-flex;
     gap: 12px;
     font-size: 11px;
-    color: #64748B;
+    color: #94A3B8;
     margin-left: 8px;
 }
 
@@ -190,7 +202,7 @@ with st.sidebar:
         <span style="font-size: 26px;">💎</span>
         <div>
             <div style="font-size: 16px; font-weight: 800; color: #F8FAFC; letter-spacing: -0.3px;">APEX FINANCIAL</div>
-            <div style="font-size: 11px; font-weight: 600; color: #60A5FA;">AUTONOMOUS ANALYST AGENT</div>
+            <div style="font-size: 11px; font-weight: 600; color: #60A5FA;">AUTONOMOUS MARKET INTELLIGENCE</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -247,7 +259,8 @@ with st.sidebar:
     <div class="sidebar-card">
         <div class="sidebar-card-title">⚙️ Agent Infrastructure</div>
         <div style="font-size: 12px; color: #CBD5E1; line-height: 1.8;">
-            <div>🧠 <b>Router:</b> LangGraph Agent</div>
+            <div>🧠 <b>Router:</b> 3-Way LangGraph Agent</div>
+            <div>📡 <b>Live Tool:</b> yfinance Market Telemetry</div>
             <div>⚡ <b>SQL Engine:</b> SQLite Text-to-SQL</div>
             <div>🔍 <b>Vector Store:</b> ChromaDB (MiniLM-L6)</div>
             <div>📊 <b>Sparse Search:</b> BM25 Okapi</div>
@@ -280,8 +293,8 @@ with st.sidebar:
             <span style="color: {status_color}; font-weight: 700;">{status_dot} {backend_status}</span>
         </div>
         <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; margin-top: 6px;">
-            <span style="color: #94A3B8;">LLM Backbone:</span>
-            <span style="color: #60A5FA; font-weight: 700;">Gemini 2.5 Flash</span>
+            <span style="color: #94A3B8;">Agent Engine:</span>
+            <span style="color: #60A5FA; font-weight: 700;">LangGraph + Gemini</span>
         </div>
         <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; margin-top: 6px;">
             <span style="color: #94A3B8;">Tracing:</span>
@@ -295,9 +308,10 @@ st.markdown("""
 <div class="hero-card">
     <div class="hero-title">Apex Financial Analyst AI</div>
     <div class="hero-subtitle">
-        Autonomous Financial Intelligence combining <b>LangGraph Agentic Routing</b>, deterministic <b>SQLite Text-to-SQL</b>, and <b>Two-Stage Hybrid RAG</b> with Cross-Encoder re-ranking.
+        Autonomous Financial Intelligence combining <b>3-Way LangGraph Routing</b>, real-time <b>yfinance Market Telemetry</b>, deterministic <b>SQLite Text-to-SQL</b>, and <b>Two-Stage Hybrid RAG</b>.
     </div>
     <div class="pill-container">
+        <div class="pill pill-gold">📈 Real-Time yfinance Live</div>
         <div class="pill pill-green">🟢 SQLite Text-to-SQL Live</div>
         <div class="pill pill-blue">🔍 Hybrid BM25 + Vector Search</div>
         <div class="pill pill-purple">🔭 Langfuse Observability Instrument</div>
@@ -307,17 +321,20 @@ st.markdown("""
 
 # 5. Quick Suggestion Chips (Prompt Starters)
 st.markdown("<div style='font-size: 13px; font-weight: 600; color: #94A3B8; margin-bottom: 8px;'>⚡ TRY A SAMPLE QUESTION:</div>", unsafe_allow_html=True)
-q_col1, q_col2, q_col3 = st.columns(3)
+q_col1, q_col2, q_col3, q_col4 = st.columns(4)
 
 prompt_to_send = None
 with q_col1:
-    if st.button("📊 Apple Net Sales & iPhone Revenue 2024", use_container_width=True):
-        prompt_to_send = "What was Apple's total net sales and iPhone revenue in 2024?"
+    if st.button("📈 Live Quote: Apple ($AAPL)", use_container_width=True):
+        prompt_to_send = "What is Apple current stock price, market cap, and P/E ratio today?"
 with q_col2:
-    if st.button("📈 Compare Net Income 2023 vs 2024", use_container_width=True):
-        prompt_to_send = "Compare Apple's net income between 2023 and 2024."
+    if st.button("⚡ Live Quote: Tesla ($TSLA)", use_container_width=True):
+        prompt_to_send = "What is Tesla stock price and market valuation today?"
 with q_col3:
-    if st.button("⚠️ Summarize Key Supply Chain Risks", use_container_width=True):
+    if st.button("📊 Audited 2024 Net Sales", use_container_width=True):
+        prompt_to_send = "What was Apple's total net sales and iPhone revenue in 2024?"
+with q_col4:
+    if st.button("⚠️ Supply Chain Risk Disclosures", use_container_width=True):
         prompt_to_send = "What are the primary geopolitical and supply chain risks mentioned in the report?"
 
 # 6. Chat History Management
@@ -333,6 +350,8 @@ for message in st.session_state.messages:
             
             if route == "sql_database":
                 badge_html = f'<div class="route-badge route-sql">⚡ Structured Route: Text-to-SQL Engine <span class="telemetry-meta">⏱️ {latency}ms | 📊 Langfuse Traced</span></div>'
+            elif route == "live_market_data":
+                badge_html = f'<div class="route-badge route-market">📈 Real-Time Route: Live yfinance API Telemetry <span class="telemetry-meta">⏱️ {latency}ms | 📊 Langfuse Traced</span></div>'
             else:
                 badge_html = f'<div class="route-badge route-vector">🔍 Unstructured Route: Hybrid RAG + Re-ranker <span class="telemetry-meta">⏱️ {latency}ms | 📊 Langfuse Traced</span></div>'
             st.markdown(badge_html, unsafe_allow_html=True)
@@ -340,7 +359,7 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
 
 # 7. User Input Handling
-user_input = st.chat_input("Ask a quantitative or qualitative financial question...")
+user_input = st.chat_input("Ask a real-time quote, quantitative statement, or qualitative question...")
 active_prompt = prompt_to_send or user_input
 
 if active_prompt:
@@ -366,6 +385,8 @@ if active_prompt:
 
                     if route == "sql_database":
                         badge_html = f'<div class="route-badge route-sql">⚡ Structured Route: Text-to-SQL Engine <span class="telemetry-meta">⏱️ {latency_ms}ms | 📊 Langfuse Traced</span></div>'
+                    elif route == "live_market_data":
+                        badge_html = f'<div class="route-badge route-market">📈 Real-Time Route: Live yfinance API Telemetry <span class="telemetry-meta">⏱️ {latency_ms}ms | 📊 Langfuse Traced</span></div>'
                     else:
                         badge_html = f'<div class="route-badge route-vector">🔍 Unstructured Route: Hybrid RAG + Re-ranker <span class="telemetry-meta">⏱️ {latency_ms}ms | 📊 Langfuse Traced</span></div>'
                     
